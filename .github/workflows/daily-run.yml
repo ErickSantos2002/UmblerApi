@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: List files in repository
+        run: ls -la
       # Passo 1: Faz o checkout do repositório
       - name: Checkout Repository
         uses: actions/checkout@v3
