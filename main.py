@@ -1,6 +1,7 @@
 import requests
 import os
 import re
+import json
 from datetime import datetime, timezone
 
 # Imports para a API do Google Drive utilizando a conta de serviço
@@ -70,6 +71,19 @@ def sanitize_filename(filename):
     return re.sub(r'[\/\\:*?"<>|]', '_', filename)
 
 ###########################################
+# CARREGAR DICIONÁRIO DE MEMBROS (Members.json)
+###########################################
+
+try:
+    with open("Members.json", "r", encoding="utf-8") as f:
+        members = json.load(f)
+    # Cria um dicionário mapeando o id do membro para o nome
+    members_dict = {member["id"]: member["nome"] for member in members}
+except Exception as e:
+    print(f"Erro ao carregar Members.json: {e}")
+    members_dict = {}
+
+###########################################
 # BUSCA E SALVA DAS CONVERSAS
 ###########################################
 
@@ -79,7 +93,13 @@ headers = {
     "Accept": "application/json"
 }
 
-# Parâmetros para buscar apenas conversas finalizadas
+def get_current_date_str():
+    """Retorna a data atual em UTC no formato YYYY-MM-DD."""
+    return datetime.utcnow().strftime("%Y-%m-%d")
+
+# Exemplo de uso:
+current_date = get_current_date_str()
+
 params_chats = {
     "organizationId": organization_id,
     "ChatState": "Closed",  # Conversas encerradas
@@ -87,8 +107,8 @@ params_chats = {
     "OrderBy": "LastMessage",
     "Skip": 0,
     "Take": 20,
-    "DateStartCreatedAtUTC": "2025-02-04",
-    "DateEndCreatedAtUTC": "2025-02-05"
+    "DateStartCreatedAtUTC": current_date,
+    "DateEndCreatedAtUTC": current_date
 }
 
 try:
@@ -114,11 +134,11 @@ try:
     # Para cada conversa finalizada, buscar mensagens e salvar em arquivo
     for chat in chat_info:
         chat_id = chat["id"]
-        contact_name = chat["name"]
+        contact_name = chat["name"]  # Nome do contato, conforme a API de chat
         created_at = chat["createdAtUTC"]
         closed_at = chat["closedAtUTC"]
 
-        # Criando o nome do arquivo (Nome + Data de início)
+        # Criando o nome do arquivo (Nome do contato + Data de início)
         formatted_date = created_at.replace(":", "-")
         file_name = f"{contact_name}_{formatted_date}.txt"
         file_path = os.path.join(folder_name, file_name)
@@ -147,11 +167,22 @@ try:
                 txt_file.write("=" * 100 + "\n")
 
                 for msg in messages:
-                    # Define o remetente (ajuste conforme a lógica da sua API)
-                    sender = "Você" if msg.get("source") == "External" else "Contato"
                     timestamp = msg.get("eventAtUTC", "Sem data")
                     content = msg.get("content", "")
+                    
+                    # Nova lógica para definir o remetente
+                    if msg.get("source") == "Member":
+                        member_info = msg.get("sentByOrganizationMember")
+                        if member_info and member_info.get("id"):
+                            member_id = member_info.get("id")
+                            sender = members_dict.get(member_id, "usuário desconhecido")
+                        else:
+                            sender = "usuário desconhecido"
+                    else:
+                        # Para mensagens que não foram enviadas por membros da organização, usa o nome do contato
+                        sender = contact_name
 
+                    # Formatação da mensagem de acordo com o tipo
                     if msg.get("messageType") == "Text" and content:
                         message_text = f"[{timestamp}] {sender}: {content}\n"
                     elif msg.get("messageType") == "Audio" and msg.get("file"):
