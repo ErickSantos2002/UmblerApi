@@ -107,8 +107,8 @@ params_chats = {
     "OrderBy": "LastMessage",
     "Skip": 0,
     "Take": 20,
-    "DateStartCreatedAtUTC": current_date,
-    "DateEndCreatedAtUTC": current_date
+    "DateStartCreatedAtUTC": current_date + "00:00:00",
+    "DateEndCreatedAtUTC": current_date + "20:00:00"
 }
 
 try:
